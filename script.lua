@@ -1,217 +1,306 @@
--- Delta Executor için Ragdoll Script (Eğitim Amaçlı)
--- GUI butonu ile kontrol edilir
+-- Delta Executor için No Clip, Fly ve God Mode
+-- Tuşlar: 
+-- N = No Clip Aç/Kapat
+-- F = Fly Aç/Kapat  
+-- G = God Mode Aç/Kapat
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
--- GUI oluşturma
+-- Oyuncu ve karakter
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Değişkenler
+local noclip = false
+local flying = false
+local godmode = false
+local flySpeed = 50
+local flyBoost = 2
+
+-- GUI oluştur
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "RagdollGUI"
-ScreenGui.Parent = game:GetService("CoreGui") or game.Players.LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Name = "CheatGUI"
+ScreenGui.Parent = game:GetService("CoreGui") or player:WaitForChild("PlayerGui")
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 100, 0, 40)
-Frame.Position = UDim2.new(0, 10, 0, 50) -- Sol üstün biraz altında
+Frame.Size = UDim2.new(0, 150, 0, 150)
+Frame.Position = UDim2.new(0, 10, 0, 100)
 Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.BackgroundTransparency = 0.3
 Frame.BorderSizePixel = 0
 Frame.Parent = ScreenGui
 
-local Button = Instance.new("TextButton")
-Button.Size = UDim2.new(1, 0, 1, 0)
-Button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-Button.Text = "Aktif Et"
-Button.Font = Enum.Font.GothamBold
-Button.TextSize = 14
-Button.Parent = Frame
+-- Başlık
+local Title = Instance.new("TextLabel")
+Title.Text = "🏴‍☠️ CHEAT MENU"
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Title.TextColor3 = Color3.fromRGB(255, 100, 100)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.Parent = Frame
 
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, 0, 0, 20)
-StatusLabel.Position = UDim2.new(0, 0, 1, 5)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-StatusLabel.Text = "Kapalı"
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextSize = 12
-StatusLabel.Parent = Frame
+-- No Clip Durumu
+local NoclipLabel = Instance.new("TextLabel")
+NoclipLabel.Name = "NoclipLabel"
+NoclipLabel.Text = "🚫 No Clip: KAPALI"
+NoclipLabel.Size = UDim2.new(1, 0, 0, 25)
+NoclipLabel.Position = UDim2.new(0, 0, 0, 35)
+NoclipLabel.BackgroundTransparency = 1
+NoclipLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+NoclipLabel.Font = Enum.Font.Gotham
+NoclipLabel.TextSize = 14
+NoclipLabel.Parent = Frame
 
--- Değişkenler
-local isActive = false
-local localPlayer = Players.LocalPlayer
-local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+-- Fly Durumu
+local FlyLabel = Instance.new("TextLabel")
+FlyLabel.Name = "FlyLabel"
+FlyLabel.Text = "✈️ Fly: KAPALI"
+FlyLabel.Size = UDim2.new(1, 0, 0, 25)
+FlyLabel.Position = UDim2.new(0, 0, 0, 60)
+FlyLabel.BackgroundTransparency = 1
+FlyLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+FlyLabel.Font = Enum.Font.Gotham
+FlyLabel.TextSize = 14
+FlyLabel.Parent = Frame
 
-local RAGDOLL_TIME = 8 -- 8 saniye
-local ACTIVATION_DISTANCE = 50 -- 50 stud mesafe
+-- God Mode Durumu
+local GodLabel = Instance.new("TextLabel")
+GodLabel.Name = "GodLabel"
+GodLabel.Text = "🛡️ God Mode: KAPALI"
+GodLabel.Size = UDim2.new(1, 0, 0, 25)
+GodLabel.Position = UDim2.new(0, 0, 0, 85)
+GodLabel.BackgroundTransparency = 1
+GodLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+GodLabel.Font = Enum.Font.Gotham
+GodLabel.TextSize = 14
+GodLabel.Parent = Frame
 
--- Ragdoll fonksiyonu
-local function applyRagdoll(targetPlayer)
-    if not targetPlayer or targetPlayer == localPlayer then return end
+-- Bilgi
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Text = "N: NoClip  F: Fly  G: God"
+InfoLabel.Size = UDim2.new(1, 0, 0, 25)
+InfoLabel.Position = UDim2.new(0, 0, 0, 120)
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+InfoLabel.Font = Enum.Font.Gotham
+InfoLabel.TextSize = 12
+InfoLabel.Parent = Frame
+
+-- NO CLIP SİSTEMİ
+local function toggleNoclip()
+    noclip = not noclip
     
-    local targetChar = targetPlayer.Character
-    if not targetChar then return end
-    
-    local targetHumanoid = targetChar:FindFirstChild("Humanoid")
-    local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-    
-    if not targetHumanoid or not targetHRP then return end
-    
-    -- Önceki ragdoll'u temizle
-    if activeRagdolls[targetPlayer] then
-        activeRagdolls[targetPlayer]:Disconnect()
-        activeRagdolls[targetPlayer] = nil
-    end
-    
-    -- Ragdoll etkisi (eğitim amaçlı simülasyon)
-    -- Not: Gerçek ragdoll için oyunun fizik motorunu manipüle etmek gerekir
-    
-    -- Simüle ragdoll efekti - karakteri yere düşür
-    targetHumanoid.PlatformStand = true
-    targetHumanoid.AutoRotate = false
-    
-    -- Rastgele güç uygula (düşme efekti)
-    local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.Velocity = Vector3.new(
-        math.random(-50, 50),
-        -math.random(20, 50),
-        math.random(-50, 50)
-    )
-    bodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000)
-    bodyVelocity.Parent = targetHRP
-    
-    -- 8 saniye sonra kaldır
-    local ragdollEndTime = tick() + RAGDOLL_TIME
-    local connection
-    
-    connection = RunService.Heartbeat:Connect(function()
-        if tick() >= ragdollEndTime then
-            -- Ragdoll'u sonlandır
-            targetHumanoid.PlatformStand = false
-            targetHumanoid.AutoRotate = true
-            
-            if bodyVelocity and bodyVelocity.Parent then
-                bodyVelocity:Destroy()
-            end
-            
-            -- Karakteri ayağa kaldır
-            targetChar:SetPrimaryPartCFrame(CFrame.new(targetHRP.Position + Vector3.new(0, 3, 0)))
-            
-            if connection then
-                connection:Disconnect()
-            end
-            
-            if activeRagdolls[targetPlayer] then
-                activeRagdolls[targetPlayer] = nil
+    if noclip then
+        NoclipLabel.Text = "✅ No Clip: AÇIK"
+        NoclipLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        
+        -- Karakterin tüm parçalarını NoClip yap
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
             end
         end
-    end)
-    
-    activeRagdolls[targetPlayer] = connection
-    
-    -- BodyVelocity'yi 0.5 saniye sonra kaldır
-    delay(0.5, function()
-        if bodyVelocity and bodyVelocity.Parent then
-            bodyVelocity:Destroy()
-        end
-    end)
-end
-
--- Oyuncu takip fonksiyonu
-local function checkNearbyPlayers()
-    while isActive do
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= localPlayer then
-                local targetChar = player.Character
-                if targetChar then
-                    local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-                    if targetHRP and humanoidRootPart then
-                        local distance = (targetHRP.Position - humanoidRootPart.Position).Magnitude
-                        
-                        if distance <= ACTIVATION_DISTANCE then
-                            -- Eğer henüz ragdoll değilse, ragdoll uygula
-                            if not activeRagdolls[player] then
-                                applyRagdoll(player)
-                                
-                                -- Bildirim (eğitim amaçlı)
-                                warn("[Ragdoll] " .. player.Name .. " ragdoll edildi! (" .. math.floor(distance) .. " stud)")
-                            end
-                        end
-                    end
-                end
-            end
-        end
-        
-        wait(0.5) -- 0.5 saniyede bir kontrol et
-    end
-end
-
--- Buton tıklama olayı
-local checkThread = nil
-Button.MouseButton1Click:Connect(function()
-    isActive = not isActive
-    
-    if isActive then
-        Button.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        Button.Text = "Kapat"
-        StatusLabel.Text = "AÇIK - " .. ACTIVATION_DISTANCE .. " stud"
-        StatusLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
-        
-        -- Karakter referansını güncelle
-        character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-        humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-        
-        -- Aktif ragdoll listesini temizle
-        activeRagdolls = {}
-        
-        -- Oyuncu kontrolünü başlat
-        checkThread = task.spawn(checkNearbyPlayers)
-        
-        -- Başlatma mesajı
-        print("[Ragdoll Script] Aktif edildi! Yaklaşan oyuncular ragdoll olacak.")
     else
-        Button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        Button.Text = "Aktif Et"
-        StatusLabel.Text = "KAPALI"
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+        NoclipLabel.Text = "🚫 No Clip: KAPALI"
+        NoclipLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
         
-        -- Tüm ragdoll'ları temizle
-        for player, connection in pairs(activeRagdolls) do
-            if connection then
-                connection:Disconnect()
+        -- Collision'ı geri aç
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+    
+    print("[NoClip] " .. (noclip and "AÇIK" or "KAPALI"))
+end
+
+-- FLY SİSTEMİ
+local function toggleFly()
+    flying = not flying
+    
+    if flying then
+        FlyLabel.Text = "✅ Fly: AÇIK"
+        FlyLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        
+        -- Fly mekaniği
+        local bodyGyro = Instance.new("BodyGyro")
+        bodyGyro.P = 10000
+        bodyGyro.D = 1000
+        bodyGyro.MaxTorque = Vector3.new(10000, 10000, 10000)
+        bodyGyro.CFrame = humanoidRootPart.CFrame
+        bodyGyro.Parent = humanoidRootPart
+        
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        bodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000)
+        bodyVelocity.Parent = humanoidRootPart
+        
+        humanoid.PlatformStand = true
+        
+        -- Fly kontrol
+        local flyConnection
+        flyConnection = RunService.Heartbeat:Connect(function()
+            if not flying then
+                flyConnection:Disconnect()
+                return
             end
             
-            -- Oyuncuları ayağa kaldır
-            local targetChar = player.Character
-            if targetChar then
-                local targetHumanoid = targetChar:FindFirstChild("Humanoid")
-                if targetHumanoid then
-                    targetHumanoid.PlatformStand = false
-                    targetHumanoid.AutoRotate = true
-                end
+            local velocity = Vector3.new(0, 0, 0)
+            local camera = Workspace.CurrentCamera
+            
+            -- W A S D kontrolü
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                velocity = velocity + (camera.CFrame.LookVector * flySpeed)
             end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                velocity = velocity - (camera.CFrame.LookVector * flySpeed)
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                velocity = velocity + (camera.CFrame.RightVector * flySpeed)
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                velocity = velocity - (camera.CFrame.RightVector * flySpeed)
+            end
+            
+            -- Yükseklik kontrolü (Space ve Shift)
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                velocity = velocity + Vector3.new(0, flySpeed, 0)
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then
+                velocity = velocity - Vector3.new(0, flySpeed, 0)
+            end
+            
+            -- Hız boost (E tuşu)
+            if UserInputService:IsKeyDown(Enum.KeyCode.E) then
+                velocity = velocity * flyBoost
+            end
+            
+            bodyVelocity.Velocity = velocity
+            bodyGyro.CFrame = camera.CFrame
+        end)
+        
+        -- Fly kapandığında temizlik
+        spawn(function()
+            while flying do
+                wait()
+            end
+            bodyGyro:Destroy()
+            bodyVelocity:Destroy()
+            humanoid.PlatformStand = false
+        end)
+        
+    else
+        FlyLabel.Text = "✈️ Fly: KAPALI"
+        FlyLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+    
+    print("[Fly] " .. (flying and "AÇIK" or "KAPALI"))
+end
+
+-- GOD MODE SİSTEMİ
+local function toggleGodmode()
+    godmode = not godmode
+    
+    if godmode then
+        GodLabel.Text = "✅ God Mode: AÇIK"
+        GodLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        
+        -- Ölümsüzlük
+        humanoid.MaxHealth = math.huge
+        humanoid.Health = math.huge
+        
+        -- Hasar engelleme
+        local oldTakeDamage = humanoid.TakeDamage
+        humanoid.TakeDamage = function() end
+        
+        -- Ölüm engelleme
+        humanoid.BreakJointsOnDeath = false
+        humanoid.RequiresNeck = false
+        
+        -- Geri alma fonksiyonu
+        humanoid.GodmodeRestore = oldTakeDamage
+        
+    else
+        GodLabel.Text = "🛡️ God Mode: KAPALI"
+        GodLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        
+        -- Normal moda dön
+        if humanoid.GodmodeRestore then
+            humanoid.TakeDamage = humanoid.GodmodeRestore
+            humanoid.GodmodeRestore = nil
         end
         
-        activeRagdolls = {}
-        
-        -- Kontrol thread'ini durdur
-        if checkThread then
-            task.cancel(checkThread)
-            checkThread = nil
-        end
-        
-        print("[Ragdoll Script] Kapatıldı.")
+        humanoid.MaxHealth = 100
+        humanoid.Health = 100
+    end
+    
+    print("[GodMode] " .. (godmode and "AÇIK" or "KAPALI"))
+end
+
+-- TUŞ KONTROLLERİ
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    -- N tuşu = No Clip
+    if input.KeyCode == Enum.KeyCode.N then
+        toggleNoclip()
+    
+    -- F tuşu = Fly
+    elseif input.KeyCode == Enum.KeyCode.F then
+        toggleFly()
+    
+    -- G tuşu = God Mode
+    elseif input.KeyCode == Enum.KeyCode.G then
+        toggleGodmode()
+    
+    -- H tuşu = Hız artır
+    elseif input.KeyCode == Enum.KeyCode.H then
+        flySpeed = flySpeed + 10
+        print("[Fly Speed] " .. flySpeed)
+    
+    -- J tuşu = Hız azalt
+    elseif input.KeyCode == Enum.KeyCode.J then
+        flySpeed = math.max(10, flySpeed - 10)
+        print("[Fly Speed] " .. flySpeed)
     end
 end)
 
--- Karakter değiştiğinde güncelle
-localPlayer.CharacterAdded:Connect(function(newChar)
-    character = newChar
-    humanoidRootPart = newChar:WaitForChild("HumanoidRootPart")
+-- NO CLIP LOOP (sürekli collision kontrol)
+spawn(function()
+    while true do
+        if noclip and character then
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+        wait(0.1)
+    end
 end)
 
--- GUI'yi sürükleme özelliği
+-- KARAKTER DEĞİŞİNCE GÜNCELLE
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = newChar:WaitForChild("Humanoid")
+    humanoidRootPart = newChar:WaitForChild("HumanoidRootPart")
+    
+    -- God mode aktifse yeniden uygula
+    if godmode then
+        task.wait(1)
+        toggleGodmode()
+        toggleGodmode()
+    end
+end)
+
+-- GUI SÜRÜKLEME
 local dragging = false
 local dragInput, dragStart, startPos
 
@@ -246,6 +335,17 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Başlangıç mesajı
-print("[Ragdoll Script] Yüklendi! Sol üstteki butona tıklayarak aktif edin.")
-print("[EĞİTİM AMAÇLIDIR] Bu script sadece eğitim amaçlıdır.")
+-- BAŞLANGIÇ MESAJI
+print("====================================")
+print("🚀 NO CLIP, FLY & GOD MODE SCRIPT")
+print("====================================")
+print("N tuşu = No Clip Aç/Kapat")
+print("F tuşu = Fly Aç/Kapat")
+print("G tuşu = God Mode Aç/Kapat")
+print("H tuşu = Fly Hızını Artır")
+print("J tuşu = Fly Hızını Azalt")
+print("WASD = Fly Hareketi")
+print("Space = Yukarı Çık")
+print("Shift = Aşağı İn")
+print("E = Hız Boost")
+print("====================================")
